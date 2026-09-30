@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1059007117504",
+    "project_id": "mychecklist-d63ff",
+    "storage_bucket": "mychecklist-d63ff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1059007117504:android:a747cf16399ec062389525",
+        "android_client_info": {
+          "package_name": "com.example.mychecklist"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZComMqeY8Ps4Frxraq3W9UZjFZztLcSE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// RNF07 - Seguranca.
+// Cada usuario acessa somente suas proprias listas e tarefas.
+// O Administrador consulta e altera o status das contas.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function ehAdmin() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'admin';
+    }
+
+    match /usuarios/{uid} {
+      // O proprio usuario le seu cadastro; o admin le todos.
+      allow read: if autenticado() && (request.auth.uid == uid || ehAdmin());
+
+      // Cadastro criado pelo proprio usuario, sempre com perfil 'usuario'.
+      allow create: if autenticado()
+        && request.auth.uid == uid
+        && request.resource.data.perfil == 'usuario'
+        && request.resource.data.ativo == true;
+
+      // Somente o admin ativa/desativa contas (UC1).
+      allow update: if ehAdmin();
+      allow delete: if false;
+    }
+
+    match /listas/{listaId} {
+      allow read, update, delete: if autenticado()
+        && resource.data.usuarioId == request.auth.uid;
+      allow create: if autenticado()
+        && request.resource.data.usuarioId == request.auth.uid;
+    }
+
+    match /tarefas/{tarefaId} {
+      allow read, update, delete: if autenticado()
+        && resource.data.usuarioId == request.auth.uid;
+      allow create: if autenticado()
+        && request.resource.data.usuarioId == request.auth.uid;
+    }
+  }
+}

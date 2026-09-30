@@ -1,0 +1,8 @@
+com.benjaminabel.vibration-debug-0 /home/marco/.pub-cache/hosted/pub.dev/vibration-2.1.0/android/src/debug/res
+com.benjaminabel.vibration-main-1 /home/marco/.pub-cache/hosted/pub.dev/vibration-2.1.0/android/src/main/res
+com.benjaminabel.vibration-pngs-2 /home/marco/StudioProjects/mychecklist/build/vibration/generated/res/pngs/debug
+com.benjaminabel.vibration-updated_navigation_xml-3 /home/marco/StudioProjects/mychecklist/build/vibration/generated/updated_navigation_xml/debug
+com.benjaminabel.vibration-mergeDebugResources-4 /home/marco/StudioProjects/mychecklist/build/vibration/intermediates/incremental/debug/mergeDebugResources/merged.dir
+com.benjaminabel.vibration-mergeDebugResources-5 /home/marco/StudioProjects/mychecklist/build/vibration/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+com.benjaminabel.vibration-debug-6 /home/marco/StudioProjects/mychecklist/build/vibration/intermediates/merged_res/debug/mergeDebugResources
+com.benjaminabel.vibration-debug-7 /home/marco/StudioProjects/mychecklist/build/vibration/intermediates/packaged_res/debug/packageDebugResources

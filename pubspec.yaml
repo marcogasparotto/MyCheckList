@@ -1,0 +1,37 @@
+name: mychecklist
+description: Aplicativo de criacao e gerenciamento de listas e tarefas pessoais (APS).
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase (armazenamento externo em nuvem - RNF04)
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.3
+
+  # Armazenamento interno (RNF03)
+  shared_preferences: ^2.3.2
+
+  # Sensores e recursos fisicos (RNF05)
+  sensors_plus: ^6.0.1
+  vibration: ^3.1.0
+
+  # Estado (MVC - Controllers observaveis)
+  provider: ^6.1.2
+
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,8 @@
+dev.fluttercommunity.plus.sensors.sensors_plus-debug-0 /home/marco/.pub-cache/hosted/pub.dev/sensors_plus-6.1.2/android/src/debug/res
+dev.fluttercommunity.plus.sensors.sensors_plus-main-1 /home/marco/.pub-cache/hosted/pub.dev/sensors_plus-6.1.2/android/src/main/res
+dev.fluttercommunity.plus.sensors.sensors_plus-pngs-2 /home/marco/StudioProjects/mychecklist/build/sensors_plus/generated/res/pngs/debug
+dev.fluttercommunity.plus.sensors.sensors_plus-updated_navigation_xml-3 /home/marco/StudioProjects/mychecklist/build/sensors_plus/generated/updated_navigation_xml/debug
+dev.fluttercommunity.plus.sensors.sensors_plus-mergeDebugResources-4 /home/marco/StudioProjects/mychecklist/build/sensors_plus/intermediates/incremental/debug/mergeDebugResources/merged.dir
+dev.fluttercommunity.plus.sensors.sensors_plus-mergeDebugResources-5 /home/marco/StudioProjects/mychecklist/build/sensors_plus/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+dev.fluttercommunity.plus.sensors.sensors_plus-debug-6 /home/marco/StudioProjects/mychecklist/build/sensors_plus/intermediates/merged_res/debug/mergeDebugResources
+dev.fluttercommunity.plus.sensors.sensors_plus-debug-7 /home/marco/StudioProjects/mychecklist/build/sensors_plus/intermediates/packaged_res/debug/packageDebugResources

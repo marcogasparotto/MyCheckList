@@ -1,0 +1,1 @@
+ /home/marco/StudioProjects/mychecklist/.dart_tool/flutter_build/42b5386a43b2f79e5829f5292302edaf/native_assets.json: 

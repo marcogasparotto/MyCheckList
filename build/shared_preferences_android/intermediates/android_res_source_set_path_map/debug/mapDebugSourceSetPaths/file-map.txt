@@ -1,0 +1,8 @@
+io.flutter.plugins.sharedpreferences.shared_preferences_android-debug-0 /home/marco/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.28/android/src/debug/res
+io.flutter.plugins.sharedpreferences.shared_preferences_android-main-1 /home/marco/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.28/android/src/main/res
+io.flutter.plugins.sharedpreferences.shared_preferences_android-pngs-2 /home/marco/StudioProjects/mychecklist/build/shared_preferences_android/generated/res/pngs/debug
+io.flutter.plugins.sharedpreferences.shared_preferences_android-updated_navigation_xml-3 /home/marco/StudioProjects/mychecklist/build/shared_preferences_android/generated/updated_navigation_xml/debug
+io.flutter.plugins.sharedpreferences.shared_preferences_android-mergeDebugResources-4 /home/marco/StudioProjects/mychecklist/build/shared_preferences_android/intermediates/incremental/debug/mergeDebugResources/merged.dir
+io.flutter.plugins.sharedpreferences.shared_preferences_android-mergeDebugResources-5 /home/marco/StudioProjects/mychecklist/build/shared_preferences_android/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+io.flutter.plugins.sharedpreferences.shared_preferences_android-debug-6 /home/marco/StudioProjects/mychecklist/build/shared_preferences_android/intermediates/merged_res/debug/mergeDebugResources
+io.flutter.plugins.sharedpreferences.shared_preferences_android-debug-7 /home/marco/StudioProjects/mychecklist/build/shared_preferences_android/intermediates/packaged_res/debug/packageDebugResources
