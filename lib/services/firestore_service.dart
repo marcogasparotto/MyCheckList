@@ -32,6 +32,9 @@ class FirestoreService {
     return Usuario.fromMap(doc.id, doc.data()!);
   }
 
+  /// Mantido para uso futuro. No fluxo de cadastro o proprio Firebase Auth
+  /// ja barra e-mail repetido (codigo `email-already-in-use`), por isso
+  /// esta consulta nao e usada antes da conta existir.
   Future<bool> emailJaCadastrado(String email) async {
     final snap = await _usuarios
         .where('email', isEqualTo: email.trim().toLowerCase())
@@ -44,9 +47,9 @@ class FirestoreService {
   Stream<List<Usuario>> observarUsuarios() {
     return _usuarios.orderBy('nome').snapshots().map(
           (snap) => snap.docs
-              .map((d) => Usuario.fromMap(d.id, d.data()))
-              .toList(),
-        );
+          .map((d) => Usuario.fromMap(d.id, d.data()))
+          .toList(),
+    );
   }
 
   /// UC1 - ativar / desativar conta.
@@ -63,7 +66,7 @@ class FirestoreService {
         .snapshots()
         .map((snap) {
       final listas =
-          snap.docs.map((d) => Lista.fromMap(d.id, d.data())).toList();
+      snap.docs.map((d) => Lista.fromMap(d.id, d.data())).toList();
       listas.sort((a, b) => b.criadaEm.compareTo(a.criadaEm));
       return listas;
     });
@@ -91,13 +94,17 @@ class FirestoreService {
 
   // ----------------------------------------------------------------- TAREFAS
 
-  Stream<List<Tarefa>> observarTarefas(String listaId) {
+  /// RNF07 - o filtro por usuarioId repete a condicao da regra do Firestore.
+  /// Sem ele, a consulta e negada por `permission-denied`, porque o Firestore
+  /// nao consegue provar sozinho que os documentos pertencem ao usuario.
+  Stream<List<Tarefa>> observarTarefas(String listaId, String usuarioId) {
     return _tarefas
         .where('listaId', isEqualTo: listaId)
+        .where('usuarioId', isEqualTo: usuarioId)
         .snapshots()
         .map((snap) {
       final tarefas =
-          snap.docs.map((d) => Tarefa.fromMap(d.id, d.data())).toList();
+      snap.docs.map((d) => Tarefa.fromMap(d.id, d.data())).toList();
       tarefas.sort((a, b) => a.criadaEm.compareTo(b.criadaEm));
       return tarefas;
     });
@@ -110,10 +117,10 @@ class FirestoreService {
   }
 
   Future<void> atualizarTarefa(
-    String id,
-    String listaId,
-    Map<String, dynamic> dados,
-  ) async {
+      String id,
+      String listaId,
+      Map<String, dynamic> dados,
+      ) async {
     await _tarefas.doc(id).update(dados);
     await _recalcularContadores(listaId);
   }

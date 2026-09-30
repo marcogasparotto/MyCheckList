@@ -17,8 +17,8 @@ class TarefaController extends ChangeNotifier {
   String? get erro => _erro;
   bool get filtroAtivo => _filtro != FiltroTarefa.todas;
 
-  Stream<List<Tarefa>> tarefasDaLista(String listaId) =>
-      _firestore.observarTarefas(listaId);
+  Stream<List<Tarefa>> tarefasDaLista(String listaId, String usuarioId) =>
+      _firestore.observarTarefas(listaId, usuarioId);
 
   /// UC6 - aplica o filtro selecionado sobre a lista carregada.
   List<Tarefa> aplicarFiltro(List<Tarefa> tarefas) {
@@ -90,8 +90,7 @@ class TarefaController extends ChangeNotifier {
     final novoStatus = !tarefa.concluida;
     await _firestore.atualizarTarefa(tarefa.id, tarefa.listaId, {
       'concluida': novoStatus,
-      'concluidaEm':
-          novoStatus ? DateTime.now().millisecondsSinceEpoch : null,
+      'concluidaEm': novoStatus ? DateTime.now().millisecondsSinceEpoch : null,
     });
   }
 

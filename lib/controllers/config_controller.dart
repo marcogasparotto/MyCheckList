@@ -4,6 +4,10 @@ import '../services/device_service.dart';
 import '../services/prefs_service.dart';
 
 /// CONTROLLER - Configuracoes do aplicativo (UC7 / RNF03).
+///
+/// Tambem centraliza o monitoramento do acelerometro (UC8): a tela de
+/// tarefas pede para ligar/desligar, e este controller mantem uma unica
+/// instancia do DeviceService para todo o app.
 class ConfigController extends ChangeNotifier {
   ConfigController({PrefsService? prefs, DeviceService? device})
       : _prefs = prefs ?? PrefsService(),
@@ -46,5 +50,25 @@ class ConfigController extends ChangeNotifier {
   /// Ponto unico de vibracao do app, ja respeitando a preferencia.
   Future<void> feedbackTatil({int duracaoMs = 60}) {
     return _device.vibrar(habilitada: _vibracao, duracaoMs: duracaoMs);
+  }
+
+  // ------------------------------------------------------------- UC8 / UC5
+
+  /// Liga o monitoramento do acelerometro. Deve ser chamado quando a tela
+  /// de tarefas entra em cena.
+  void iniciarMonitoramento(void Function() onAgitar) {
+    _device.monitorarAgitacao(onAgitar);
+  }
+
+  /// Desliga o monitoramento. Deve ser chamado no dispose da tela, para
+  /// que a inscricao no sensor nao sobreviva a ela.
+  void pararMonitoramento() {
+    _device.cancelar();
+  }
+
+  @override
+  void dispose() {
+    _device.cancelar();
+    super.dispose();
   }
 }
