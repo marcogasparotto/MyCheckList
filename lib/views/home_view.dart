@@ -200,8 +200,15 @@ class HomeView extends StatelessWidget {
       ),
     );
 
-    if (confirmado == true && context.mounted) {
-      await context.read<ListaController>().excluir(lista.id);
+    if (confirmado != true || !context.mounted) return;
+
+    try {
+      await context.read<ListaController>().excluir(lista);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível excluir a lista.')),
+      );
     }
   }
 }

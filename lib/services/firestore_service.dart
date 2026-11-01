@@ -82,8 +82,13 @@ class FirestoreService {
   }
 
   /// Exclui a lista e, em lote, todas as tarefas vinculadas a ela.
-  Future<void> excluirLista(String id) async {
-    final tarefas = await _tarefas.where('listaId', isEqualTo: id).get();
+  /// A consulta tambem filtra por usuarioId, pelo mesmo motivo de
+  /// observarTarefas: sem esse filtro as regras negam com `permission-denied`.
+  Future<void> excluirLista(String id, String usuarioId) async {
+    final tarefas = await _tarefas
+        .where('listaId', isEqualTo: id)
+        .where('usuarioId', isEqualTo: usuarioId)
+        .get();
     final lote = _db.batch();
     for (final doc in tarefas.docs) {
       lote.delete(doc.reference);
@@ -112,27 +117,32 @@ class FirestoreService {
 
   Future<String> criarTarefa(Tarefa tarefa) async {
     final ref = await _tarefas.add(tarefa.toMap());
-    await _recalcularContadores(tarefa.listaId);
+    await _recalcularContadores(tarefa.listaId, tarefa.usuarioId);
     return ref.id;
   }
 
   Future<void> atualizarTarefa(
       String id,
       String listaId,
+      String usuarioId,
       Map<String, dynamic> dados,
       ) async {
     await _tarefas.doc(id).update(dados);
-    await _recalcularContadores(listaId);
+    await _recalcularContadores(listaId, usuarioId);
   }
 
-  Future<void> excluirTarefa(String id, String listaId) async {
+  Future<void> excluirTarefa(String id, String listaId, String usuarioId) async {
     await _tarefas.doc(id).delete();
-    await _recalcularContadores(listaId);
+    await _recalcularContadores(listaId, usuarioId);
   }
 
   /// Mantem os agregados da lista atualizados para a tela principal (UC6).
-  Future<void> _recalcularContadores(String listaId) async {
-    final snap = await _tarefas.where('listaId', isEqualTo: listaId).get();
+  /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
+  Future<void> _recalcularContadores(String listaId, String usuarioId) async {
+    final snap = await _tarefas
+        .where('listaId', isEqualTo: listaId)
+        .where('usuarioId', isEqualTo: usuarioId)
+        .get();
     final total = snap.docs.length;
     final concluidas =
         snap.docs.where((d) => (d.data()['concluida'] ?? false) == true).length;
