@@ -110,37 +110,25 @@ class _TarefasViewState extends State<TarefasView> {
 
   /// UC4 - edita a descricao de uma tarefa existente.
   Future<void> _editar(Tarefa tarefa) async {
-    final campo = TextEditingController(text: tarefa.descricao);
-
     final novo = await showDialog<String>(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Editar tarefa'),
-        content: TextField(
-          controller: campo,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Descrição'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(campo.text),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
+      builder: (_) => _DialogoEdicaoTarefa(descricaoInicial: tarefa.descricao),
     );
 
-    campo.dispose();
+    // Cancelar devolve null: nada e gravado.
+    if (novo == null || novo.trim().isEmpty || !mounted) return;
 
-    if (novo != null && novo.trim().isNotEmpty && mounted) {
+    try {
       await _tarefaCtrl.editar(
         id: tarefa.id,
         listaId: tarefa.listaId,
+        usuarioId: tarefa.usuarioId,
         descricao: novo,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível salvar a tarefa.')),
       );
     }
   }
@@ -270,6 +258,56 @@ class _TarefasViewState extends State<TarefasView> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Caixa de edicao da descricao. O controller fica no State deste dialogo e
+/// so e descartado depois que o dialogo sai da tela. Antes ele era descartado
+/// logo apos o await, enquanto a animacao de saida ainda o usava.
+class _DialogoEdicaoTarefa extends StatefulWidget {
+  const _DialogoEdicaoTarefa({required this.descricaoInicial});
+
+  final String descricaoInicial;
+
+  @override
+  State<_DialogoEdicaoTarefa> createState() => _DialogoEdicaoTarefaState();
+}
+
+class _DialogoEdicaoTarefaState extends State<_DialogoEdicaoTarefa> {
+  late final TextEditingController _campo;
+
+  @override
+  void initState() {
+    super.initState();
+    _campo = TextEditingController(text: widget.descricaoInicial);
+  }
+
+  @override
+  void dispose() {
+    _campo.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Editar tarefa'),
+      content: TextField(
+        controller: _campo,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Descrição'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_campo.text),
+          child: const Text('Salvar'),
+        ),
+      ],
     );
   }
 }

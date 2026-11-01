@@ -70,6 +70,7 @@ class TarefaController extends ChangeNotifier {
   Future<bool> editar({
     required String id,
     required String listaId,
+    required String usuarioId,
     required String descricao,
   }) async {
     if (descricao.trim().isEmpty) {
@@ -79,7 +80,7 @@ class TarefaController extends ChangeNotifier {
     }
 
     _erro = null;
-    await _firestore.atualizarTarefa(id, listaId, {
+    await _firestore.atualizarTarefa(id, listaId, usuarioId, {
       'descricao': descricao.trim(),
     });
     return true;
@@ -88,12 +89,12 @@ class TarefaController extends ChangeNotifier {
   /// UC5 - alterna entre concluida e pendente.
   Future<void> alternarConclusao(Tarefa tarefa) async {
     final novoStatus = !tarefa.concluida;
-    await _firestore.atualizarTarefa(tarefa.id, tarefa.listaId, {
+    await _firestore.atualizarTarefa(tarefa.id, tarefa.listaId, tarefa.usuarioId, {
       'concluida': novoStatus,
       'concluidaEm': novoStatus ? DateTime.now().millisecondsSinceEpoch : null,
     });
   }
 
   Future<void> excluir(Tarefa tarefa) =>
-      _firestore.excluirTarefa(tarefa.id, tarefa.listaId);
+      _firestore.excluirTarefa(tarefa.id, tarefa.listaId, tarefa.usuarioId);
 }

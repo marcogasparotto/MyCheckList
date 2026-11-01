@@ -60,5 +60,6 @@ class ListaController extends ChangeNotifier {
     return true;
   }
 
-  Future<void> excluir(String id) => _firestore.excluirLista(id);
+  Future<void> excluir(Lista lista) =>
+      _firestore.excluirLista(lista.id, lista.usuarioId);
 }
