@@ -100,11 +100,11 @@ class HomeView extends StatelessWidget {
     );
   }
 
-  /// UC3 - formulario de criacao / edicao de lista.
+  /// UC3 - abre o formulario de criacao / edicao de lista.
+  /// Os controllers ficam dentro de _FormularioLista, que os descarta quando
+  /// o formulario sai da tela. Descarta-los aqui, logo apos o await, quebrava
+  /// a animacao de saida da folha.
   Future<void> _abrirFormulario(BuildContext context, {Lista? lista}) async {
-    final nome = TextEditingController(text: lista?.nome ?? '');
-    final descricao = TextEditingController(text: lista?.descricao ?? '');
-    final formKey = GlobalKey<FormState>();
     final ctrl = context.read<ListaController>();
     final config = context.read<ConfigController>();
     final usuarioId = context.read<AuthController>().usuario!.id;
@@ -112,71 +112,13 @@ class HomeView extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                lista == null ? 'Nova lista' : 'Editar lista',
-                style: Theme.of(ctx).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: nome,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Nome da lista'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Informe o nome da lista'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: descricao,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição (opcional)',
-                ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () async {
-                  if (!formKey.currentState!.validate()) return;
-
-                  final ok = lista == null
-                      ? await ctrl.criar(
-                          usuarioId: usuarioId,
-                          nome: nome.text,
-                          descricao: descricao.text,
-                        )
-                      : await ctrl.editar(
-                          id: lista.id,
-                          nome: nome.text,
-                          descricao: descricao.text,
-                        );
-
-                  if (ok) {
-                    await config.feedbackTatil(duracaoMs: 40);
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
-          ),
-        ),
+      builder: (_) => _FormularioLista(
+        lista: lista,
+        ctrl: ctrl,
+        config: config,
+        usuarioId: usuarioId,
       ),
     );
-
-    nome.dispose();
-    descricao.dispose();
   }
 
   Future<void> _confirmarExclusao(BuildContext context, Lista lista) async {
@@ -233,6 +175,113 @@ class _Mensagem extends StatelessWidget {
               texto,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Formulario de lista. Dono dos controllers: cria no initState e descarta no
+/// dispose, so depois que a folha sai da arvore.
+class _FormularioLista extends StatefulWidget {
+  const _FormularioLista({
+    required this.ctrl,
+    required this.config,
+    required this.usuarioId,
+    this.lista,
+  });
+
+  final Lista? lista;
+  final ListaController ctrl;
+  final ConfigController config;
+  final String usuarioId;
+
+  @override
+  State<_FormularioLista> createState() => _FormularioListaState();
+}
+
+class _FormularioListaState extends State<_FormularioLista> {
+  late final TextEditingController _nome;
+  late final TextEditingController _descricao;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _nome = TextEditingController(text: widget.lista?.nome ?? '');
+    _descricao = TextEditingController(text: widget.lista?.descricao ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nome.dispose();
+    _descricao.dispose();
+    super.dispose();
+  }
+
+  Future<void> _salvar() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final lista = widget.lista;
+    final ok = lista == null
+        ? await widget.ctrl.criar(
+            usuarioId: widget.usuarioId,
+            nome: _nome.text,
+            descricao: _descricao.text,
+          )
+        : await widget.ctrl.editar(
+            id: lista.id,
+            nome: _nome.text,
+            descricao: _descricao.text,
+          );
+
+    if (ok) {
+      await widget.config.feedbackTatil(duracaoMs: 40);
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.lista == null ? 'Nova lista' : 'Editar lista',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nome,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Nome da lista'),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Informe o nome da lista'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _descricao,
+              decoration: const InputDecoration(
+                labelText: 'Descrição (opcional)',
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _salvar,
+              child: const Text('Salvar'),
             ),
           ],
         ),
