@@ -1,0 +1,238 @@
+cat > fix-exclusao-edicao.patch << 'EOF'
+diff --git a/lib/controllers/lista_controller.dart b/lib/controllers/lista_controller.dart
+index 53587f2..1eb65a6 100644
+--- a/lib/controllers/lista_controller.dart
++++ b/lib/controllers/lista_controller.dart
+@@ -60,5 +60,6 @@ class ListaController extends ChangeNotifier {
+     return true;
+   }
+ 
+-  Future<void> excluir(String id) => _firestore.excluirLista(id);
++  Future<void> excluir(Lista lista) =>
++      _firestore.excluirLista(lista.id, lista.usuarioId);
+ }
+diff --git a/lib/controllers/tarefa_controller.dart b/lib/controllers/tarefa_controller.dart
+index 7cafcdf..da8a0ae 100644
+--- a/lib/controllers/tarefa_controller.dart
++++ b/lib/controllers/tarefa_controller.dart
+@@ -70,6 +70,7 @@ class TarefaController extends ChangeNotifier {
+   Future<bool> editar({
+     required String id,
+     required String listaId,
++    required String usuarioId,
+     required String descricao,
+   }) async {
+     if (descricao.trim().isEmpty) {
+@@ -79,7 +80,7 @@ class TarefaController extends ChangeNotifier {
+     }
+ 
+     _erro = null;
+-    await _firestore.atualizarTarefa(id, listaId, {
++    await _firestore.atualizarTarefa(id, listaId, usuarioId, {
+       'descricao': descricao.trim(),
+     });
+     return true;
+@@ -88,12 +89,12 @@ class TarefaController extends ChangeNotifier {
+   /// UC5 - alterna entre concluida e pendente.
+   Future<void> alternarConclusao(Tarefa tarefa) async {
+     final novoStatus = !tarefa.concluida;
+-    await _firestore.atualizarTarefa(tarefa.id, tarefa.listaId, {
++    await _firestore.atualizarTarefa(tarefa.id, tarefa.listaId, tarefa.usuarioId, {
+       'concluida': novoStatus,
+       'concluidaEm': novoStatus ? DateTime.now().millisecondsSinceEpoch : null,
+     });
+   }
+ 
+   Future<void> excluir(Tarefa tarefa) =>
+-      _firestore.excluirTarefa(tarefa.id, tarefa.listaId);
++      _firestore.excluirTarefa(tarefa.id, tarefa.listaId, tarefa.usuarioId);
+ }
+diff --git a/lib/services/firestore_service.dart b/lib/services/firestore_service.dart
+index 7ae1061..925848f 100644
+--- a/lib/services/firestore_service.dart
++++ b/lib/services/firestore_service.dart
+@@ -82,8 +82,13 @@ class FirestoreService {
+   }
+ 
+   /// Exclui a lista e, em lote, todas as tarefas vinculadas a ela.
+-  Future<void> excluirLista(String id) async {
+-    final tarefas = await _tarefas.where('listaId', isEqualTo: id).get();
++  /// A consulta tambem filtra por usuarioId, pelo mesmo motivo de
++  /// observarTarefas: sem esse filtro as regras negam com `permission-denied`.
++  Future<void> excluirLista(String id, String usuarioId) async {
++    final tarefas = await _tarefas
++        .where('listaId', isEqualTo: id)
++        .where('usuarioId', isEqualTo: usuarioId)
++        .get();
+     final lote = _db.batch();
+     for (final doc in tarefas.docs) {
+       lote.delete(doc.reference);
+@@ -112,27 +117,32 @@ class FirestoreService {
+ 
+   Future<String> criarTarefa(Tarefa tarefa) async {
+     final ref = await _tarefas.add(tarefa.toMap());
+-    await _recalcularContadores(tarefa.listaId);
++    await _recalcularContadores(tarefa.listaId, tarefa.usuarioId);
+     return ref.id;
+   }
+ 
+   Future<void> atualizarTarefa(
+       String id,
+       String listaId,
++      String usuarioId,
+       Map<String, dynamic> dados,
+       ) async {
+     await _tarefas.doc(id).update(dados);
+-    await _recalcularContadores(listaId);
++    await _recalcularContadores(listaId, usuarioId);
+   }
+ 
+-  Future<void> excluirTarefa(String id, String listaId) async {
++  Future<void> excluirTarefa(String id, String listaId, String usuarioId) async {
+     await _tarefas.doc(id).delete();
+-    await _recalcularContadores(listaId);
++    await _recalcularContadores(listaId, usuarioId);
+   }
+ 
+   /// Mantem os agregados da lista atualizados para a tela principal (UC6).
+-  Future<void> _recalcularContadores(String listaId) async {
+-    final snap = await _tarefas.where('listaId', isEqualTo: listaId).get();
++  /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
++  Future<void> _recalcularContadores(String listaId, String usuarioId) async {
++    final snap = await _tarefas
++        .where('listaId', isEqualTo: listaId)
++        .where('usuarioId', isEqualTo: usuarioId)
++        .get();
+     final total = snap.docs.length;
+     final concluidas =
+         snap.docs.where((d) => (d.data()['concluida'] ?? false) == true).length;
+diff --git a/lib/views/home_view.dart b/lib/views/home_view.dart
+index 80357e4..c7792ec 100644
+--- a/lib/views/home_view.dart
++++ b/lib/views/home_view.dart
+@@ -200,8 +200,15 @@ class HomeView extends StatelessWidget {
+       ),
+     );
+ 
+-    if (confirmado == true && context.mounted) {
+-      await context.read<ListaController>().excluir(lista.id);
++    if (confirmado != true || !context.mounted) return;
++
++    try {
++      await context.read<ListaController>().excluir(lista);
++    } catch (_) {
++      if (!context.mounted) return;
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Não foi possível excluir a lista.')),
++      );
+     }
+   }
+ }
+diff --git a/lib/views/tarefas_view.dart b/lib/views/tarefas_view.dart
+index be972d7..d948319 100644
+--- a/lib/views/tarefas_view.dart
++++ b/lib/views/tarefas_view.dart
+@@ -110,38 +110,26 @@ class _TarefasViewState extends State<TarefasView> {
+ 
+   /// UC4 - edita a descricao de uma tarefa existente.
+   Future<void> _editar(Tarefa tarefa) async {
+-    final campo = TextEditingController(text: tarefa.descricao);
+-
+     final novo = await showDialog<String>(
+       context: context,
+-      builder: (dialogCtx) => AlertDialog(
+-        title: const Text('Editar tarefa'),
+-        content: TextField(
+-          controller: campo,
+-          autofocus: true,
+-          decoration: const InputDecoration(labelText: 'Descrição'),
+-        ),
+-        actions: [
+-          TextButton(
+-            onPressed: () => Navigator.of(dialogCtx).pop(),
+-            child: const Text('Cancelar'),
+-          ),
+-          FilledButton(
+-            onPressed: () => Navigator.of(dialogCtx).pop(campo.text),
+-            child: const Text('Salvar'),
+-          ),
+-        ],
+-      ),
++      builder: (_) => _DialogoEdicaoTarefa(descricaoInicial: tarefa.descricao),
+     );
+ 
+-    campo.dispose();
++    // Cancelar devolve null: nada e gravado.
++    if (novo == null || novo.trim().isEmpty || !mounted) return;
+ 
+-    if (novo != null && novo.trim().isNotEmpty && mounted) {
++    try {
+       await _tarefaCtrl.editar(
+         id: tarefa.id,
+         listaId: tarefa.listaId,
++        usuarioId: tarefa.usuarioId,
+         descricao: novo,
+       );
++    } catch (_) {
++      if (!mounted) return;
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Não foi possível salvar a tarefa.')),
++      );
+     }
+   }
+ 
+@@ -273,3 +261,53 @@ class _TarefasViewState extends State<TarefasView> {
+     );
+   }
+ }
++
++/// Caixa de edicao da descricao. O controller fica no State deste dialogo e
++/// so e descartado depois que o dialogo sai da tela. Antes ele era descartado
++/// logo apos o await, enquanto a animacao de saida ainda o usava.
++class _DialogoEdicaoTarefa extends StatefulWidget {
++  const _DialogoEdicaoTarefa({required this.descricaoInicial});
++
++  final String descricaoInicial;
++
++  @override
++  State<_DialogoEdicaoTarefa> createState() => _DialogoEdicaoTarefaState();
++}
++
++class _DialogoEdicaoTarefaState extends State<_DialogoEdicaoTarefa> {
++  late final TextEditingController _campo;
++
++  @override
++  void initState() {
++    super.initState();
++    _campo = TextEditingController(text: widget.descricaoInicial);
++  }
++
++  @override
++  void dispose() {
++    _campo.dispose();
++    super.dispose();
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return AlertDialog(
++      title: const Text('Editar tarefa'),
++      content: TextField(
++        controller: _campo,
++        autofocus: true,
++        decoration: const InputDecoration(labelText: 'Descrição'),
++      ),
++      actions: [
++        TextButton(
++          onPressed: () => Navigator.of(context).pop(),
++          child: const Text('Cancelar'),
++        ),
++        FilledButton(
++          onPressed: () => Navigator.of(context).pop(_campo.text),
++          child: const Text('Salvar'),
++        ),
++      ],
++    );
++  }
++}
++EOF

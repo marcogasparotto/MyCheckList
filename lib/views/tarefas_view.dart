@@ -27,6 +27,10 @@ class _TarefasViewState extends State<TarefasView> {
   late final TarefaController _tarefaCtrl;
   late final AuthController _auth;
 
+  // Stream criado UMA vez. Se fosse criado no build, cada reconstrucao
+  // abriria uma nova consulta no Firestore.
+  late final Stream<List<Tarefa>> _tarefasStream;
+
   bool _dialogoAberto = false;
 
   @override
@@ -37,6 +41,11 @@ class _TarefasViewState extends State<TarefasView> {
     _config = context.read<ConfigController>();
     _tarefaCtrl = context.read<TarefaController>();
     _auth = context.read<AuthController>();
+
+    _tarefasStream = _tarefaCtrl.tarefasDaLista(
+      widget.lista.id,
+      _auth.usuario?.id ?? '',
+    );
 
     _config.iniciarMonitoramento(_aoAgitar);
   }
@@ -122,13 +131,26 @@ class _TarefasViewState extends State<TarefasView> {
       await _tarefaCtrl.editar(
         id: tarefa.id,
         listaId: tarefa.listaId,
-        usuarioId: tarefa.usuarioId,
         descricao: novo,
       );
-    } catch (_) {
+    } catch (e, s) {
+      debugPrint('Erro ao editar tarefa: $e\n$s');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Não foi possível salvar a tarefa.')),
+      );
+    }
+  }
+
+  /// UC4 - exclui a tarefa. Falhas do Firestore sao mostradas ao usuario.
+  Future<void> _excluir(Tarefa tarefa) async {
+    try {
+      await _tarefaCtrl.excluir(tarefa);
+    } catch (e, s) {
+      debugPrint('Erro ao excluir tarefa: $e\n$s');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível excluir a tarefa.')),
       );
     }
   }
@@ -182,10 +204,7 @@ class _TarefasViewState extends State<TarefasView> {
             ),
           Expanded(
             child: StreamBuilder<List<Tarefa>>(
-              stream: tarefaCtrl.tarefasDaLista(
-                widget.lista.id,
-                _auth.usuario?.id ?? '',
-              ),
+              stream: _tarefasStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -224,7 +243,7 @@ class _TarefasViewState extends State<TarefasView> {
                         }
                       },
                       onEditar: () => _editar(tarefa),
-                      onExcluir: () => tarefaCtrl.excluir(tarefa),
+                      onExcluir: () => _excluir(tarefa),
                     );
                   },
                 );
@@ -263,8 +282,8 @@ class _TarefasViewState extends State<TarefasView> {
 }
 
 /// Caixa de edicao da descricao. O controller fica no State deste dialogo e
-/// so e descartado depois que o dialogo sai da tela. Antes ele era descartado
-/// logo apos o await, enquanto a animacao de saida ainda o usava.
+/// so e descartado depois que o dialogo sai da tela. Se ele fosse descartado
+/// logo apos o await, a animacao de saida ainda o usaria e daria erro.
 class _DialogoEdicaoTarefa extends StatefulWidget {
   const _DialogoEdicaoTarefa({required this.descricaoInicial});
 

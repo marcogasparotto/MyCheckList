@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/lista.dart';
 import '../models/tarefa.dart';
@@ -19,6 +20,10 @@ class FirestoreService {
       _db.collection('listas');
   CollectionReference<Map<String, dynamic>> get _tarefas =>
       _db.collection('tarefas');
+
+  /// UID do usuario logado. As consultas de tarefas precisam filtrar por ele
+  /// para passar pelas regras do Firestore (RNF07).
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   // ---------------------------------------------------------------- USUARIOS
 
@@ -81,13 +86,12 @@ class FirestoreService {
     await _listas.doc(id).update(dados);
   }
 
-  /// Exclui a lista e, em lote, todas as tarefas vinculadas a ela.
-  /// A consulta tambem filtra por usuarioId, pelo mesmo motivo de
-  /// observarTarefas: sem esse filtro as regras negam com `permission-denied`.
-  Future<void> excluirLista(String id, String usuarioId) async {
+  /// Exclui a lista e, em lote, as tarefas vinculadas a ela.
+  /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
+  Future<void> excluirLista(String id) async {
     final tarefas = await _tarefas
         .where('listaId', isEqualTo: id)
-        .where('usuarioId', isEqualTo: usuarioId)
+        .where('usuarioId', isEqualTo: _uid)
         .get();
     final lote = _db.batch();
     for (final doc in tarefas.docs) {
@@ -117,31 +121,30 @@ class FirestoreService {
 
   Future<String> criarTarefa(Tarefa tarefa) async {
     final ref = await _tarefas.add(tarefa.toMap());
-    await _recalcularContadores(tarefa.listaId, tarefa.usuarioId);
+    await _recalcularContadores(tarefa.listaId);
     return ref.id;
   }
 
   Future<void> atualizarTarefa(
       String id,
       String listaId,
-      String usuarioId,
       Map<String, dynamic> dados,
       ) async {
     await _tarefas.doc(id).update(dados);
-    await _recalcularContadores(listaId, usuarioId);
+    await _recalcularContadores(listaId);
   }
 
-  Future<void> excluirTarefa(String id, String listaId, String usuarioId) async {
+  Future<void> excluirTarefa(String id, String listaId) async {
     await _tarefas.doc(id).delete();
-    await _recalcularContadores(listaId, usuarioId);
+    await _recalcularContadores(listaId);
   }
 
   /// Mantem os agregados da lista atualizados para a tela principal (UC6).
   /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
-  Future<void> _recalcularContadores(String listaId, String usuarioId) async {
+  Future<void> _recalcularContadores(String listaId) async {
     final snap = await _tarefas
         .where('listaId', isEqualTo: listaId)
-        .where('usuarioId', isEqualTo: usuarioId)
+        .where('usuarioId', isEqualTo: _uid)
         .get();
     final total = snap.docs.length;
     final concluidas =
