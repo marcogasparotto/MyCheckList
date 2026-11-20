@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/lista.dart';
 import '../models/tarefa.dart';
@@ -19,6 +20,10 @@ class FirestoreService {
       _db.collection('listas');
   CollectionReference<Map<String, dynamic>> get _tarefas =>
       _db.collection('tarefas');
+
+  /// UID do usuario logado. As consultas de tarefas precisam filtrar por ele
+  /// para passar pelas regras do Firestore (RNF07).
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   // ---------------------------------------------------------------- USUARIOS
 
@@ -81,9 +86,13 @@ class FirestoreService {
     await _listas.doc(id).update(dados);
   }
 
-  /// Exclui a lista e, em lote, todas as tarefas vinculadas a ela.
+  /// Exclui a lista e, em lote, as tarefas vinculadas a ela.
+  /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
   Future<void> excluirLista(String id) async {
-    final tarefas = await _tarefas.where('listaId', isEqualTo: id).get();
+    final tarefas = await _tarefas
+        .where('listaId', isEqualTo: id)
+        .where('usuarioId', isEqualTo: _uid)
+        .get();
     final lote = _db.batch();
     for (final doc in tarefas.docs) {
       lote.delete(doc.reference);
@@ -131,8 +140,12 @@ class FirestoreService {
   }
 
   /// Mantem os agregados da lista atualizados para a tela principal (UC6).
+  /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
   Future<void> _recalcularContadores(String listaId) async {
-    final snap = await _tarefas.where('listaId', isEqualTo: listaId).get();
+    final snap = await _tarefas
+        .where('listaId', isEqualTo: listaId)
+        .where('usuarioId', isEqualTo: _uid)
+        .get();
     final total = snap.docs.length;
     final concluidas =
         snap.docs.where((d) => (d.data()['concluida'] ?? false) == true).length;

@@ -121,6 +121,7 @@ class HomeView extends StatelessWidget {
     );
   }
 
+  /// UC3 - exclui a lista depois de confirmar. Falhas sao mostradas ao usuario.
   Future<void> _confirmarExclusao(BuildContext context, Lista lista) async {
     final confirmado = await showDialog<bool>(
       context: context,
@@ -142,8 +143,16 @@ class HomeView extends StatelessWidget {
       ),
     );
 
-    if (confirmado == true && context.mounted) {
+    if (confirmado != true || !context.mounted) return;
+
+    try {
       await context.read<ListaController>().excluir(lista.id);
+    } catch (e, s) {
+      debugPrint('Erro ao excluir lista: $e\n$s');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível excluir a lista.')),
+      );
     }
   }
 }
@@ -207,6 +216,9 @@ class _FormularioListaState extends State<_FormularioLista> {
   late final TextEditingController _descricao;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // Erro exibido dentro da folha. Um SnackBar ficaria escondido atras dela.
+  String? _erro;
+
   @override
   void initState() {
     super.initState();
@@ -224,22 +236,35 @@ class _FormularioListaState extends State<_FormularioLista> {
   Future<void> _salvar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    setState(() => _erro = null);
     final lista = widget.lista;
-    final ok = lista == null
-        ? await widget.ctrl.criar(
-            usuarioId: widget.usuarioId,
-            nome: _nome.text,
-            descricao: _descricao.text,
-          )
-        : await widget.ctrl.editar(
-            id: lista.id,
-            nome: _nome.text,
-            descricao: _descricao.text,
-          );
 
-    if (ok) {
+    try {
+      final ok = lista == null
+          ? await widget.ctrl.criar(
+              usuarioId: widget.usuarioId,
+              nome: _nome.text,
+              descricao: _descricao.text,
+            )
+          : await widget.ctrl.editar(
+              id: lista.id,
+              nome: _nome.text,
+              descricao: _descricao.text,
+            );
+
+      if (!mounted) return;
+      if (!ok) {
+        setState(() => _erro = 'Não foi possível salvar a lista.');
+        return;
+      }
+
       await widget.config.feedbackTatil(duracaoMs: 40);
       if (mounted) Navigator.of(context).pop();
+    } catch (e, s) {
+      debugPrint('Erro ao salvar lista: $e\n$s');
+      if (mounted) {
+        setState(() => _erro = 'Não foi possível salvar a lista.');
+      }
     }
   }
 
@@ -278,6 +303,13 @@ class _FormularioListaState extends State<_FormularioLista> {
                 labelText: 'Descrição (opcional)',
               ),
             ),
+            if (_erro != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _erro!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _salvar,

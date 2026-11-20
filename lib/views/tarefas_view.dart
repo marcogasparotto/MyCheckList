@@ -27,6 +27,10 @@ class _TarefasViewState extends State<TarefasView> {
   late final TarefaController _tarefaCtrl;
   late final AuthController _auth;
 
+  // Stream criado UMA vez. Se fosse criado no build, cada reconstrucao
+  // abriria uma nova consulta no Firestore.
+  late final Stream<List<Tarefa>> _tarefasStream;
+
   bool _dialogoAberto = false;
 
   @override
@@ -37,6 +41,11 @@ class _TarefasViewState extends State<TarefasView> {
     _config = context.read<ConfigController>();
     _tarefaCtrl = context.read<TarefaController>();
     _auth = context.read<AuthController>();
+
+    _tarefasStream = _tarefaCtrl.tarefasDaLista(
+      widget.lista.id,
+      _auth.usuario?.id ?? '',
+    );
 
     _config.iniciarMonitoramento(_aoAgitar);
   }
@@ -110,37 +119,38 @@ class _TarefasViewState extends State<TarefasView> {
 
   /// UC4 - edita a descricao de uma tarefa existente.
   Future<void> _editar(Tarefa tarefa) async {
-    final campo = TextEditingController(text: tarefa.descricao);
-
     final novo = await showDialog<String>(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Editar tarefa'),
-        content: TextField(
-          controller: campo,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Descrição'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(campo.text),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
+      builder: (_) => _DialogoEdicaoTarefa(descricaoInicial: tarefa.descricao),
     );
 
-    campo.dispose();
+    // Cancelar devolve null: nada e gravado.
+    if (novo == null || novo.trim().isEmpty || !mounted) return;
 
-    if (novo != null && novo.trim().isNotEmpty && mounted) {
+    try {
       await _tarefaCtrl.editar(
         id: tarefa.id,
         listaId: tarefa.listaId,
         descricao: novo,
+      );
+    } catch (e, s) {
+      debugPrint('Erro ao editar tarefa: $e\n$s');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível salvar a tarefa.')),
+      );
+    }
+  }
+
+  /// UC4 - exclui a tarefa. Falhas do Firestore sao mostradas ao usuario.
+  Future<void> _excluir(Tarefa tarefa) async {
+    try {
+      await _tarefaCtrl.excluir(tarefa);
+    } catch (e, s) {
+      debugPrint('Erro ao excluir tarefa: $e\n$s');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível excluir a tarefa.')),
       );
     }
   }
@@ -194,10 +204,7 @@ class _TarefasViewState extends State<TarefasView> {
             ),
           Expanded(
             child: StreamBuilder<List<Tarefa>>(
-              stream: tarefaCtrl.tarefasDaLista(
-                widget.lista.id,
-                _auth.usuario?.id ?? '',
-              ),
+              stream: _tarefasStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -236,7 +243,7 @@ class _TarefasViewState extends State<TarefasView> {
                         }
                       },
                       onEditar: () => _editar(tarefa),
-                      onExcluir: () => tarefaCtrl.excluir(tarefa),
+                      onExcluir: () => _excluir(tarefa),
                     );
                   },
                 );
@@ -270,6 +277,56 @@ class _TarefasViewState extends State<TarefasView> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Caixa de edicao da descricao. O controller fica no State deste dialogo e
+/// so e descartado depois que o dialogo sai da tela. Se ele fosse descartado
+/// logo apos o await, a animacao de saida ainda o usaria e daria erro.
+class _DialogoEdicaoTarefa extends StatefulWidget {
+  const _DialogoEdicaoTarefa({required this.descricaoInicial});
+
+  final String descricaoInicial;
+
+  @override
+  State<_DialogoEdicaoTarefa> createState() => _DialogoEdicaoTarefaState();
+}
+
+class _DialogoEdicaoTarefaState extends State<_DialogoEdicaoTarefa> {
+  late final TextEditingController _campo;
+
+  @override
+  void initState() {
+    super.initState();
+    _campo = TextEditingController(text: widget.descricaoInicial);
+  }
+
+  @override
+  void dispose() {
+    _campo.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Editar tarefa'),
+      content: TextField(
+        controller: _campo,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Descrição'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_campo.text),
+          child: const Text('Salvar'),
+        ),
+      ],
     );
   }
 }
