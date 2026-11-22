@@ -4,16 +4,72 @@ import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/config_controller.dart';
 import '../controllers/lista_controller.dart';
+import '../controllers/tarefa_controller.dart';
 import '../models/lista.dart';
 import '../widgets/lista_card.dart';
 import 'config_view.dart';
 import 'login_view.dart';
 import 'tarefas_view.dart';
 
-/// VIEW - Tela principal: listas do usuario com progresso (UC3, UC6).
-class HomeView extends StatelessWidget {
+/// VIEW - Tela principal: listas do usuario com progresso (UC3, UC6) e
+/// aviso de vencimentos ao agitar o aparelho.
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
   static const rota = '/home';
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  late final ConfigController _config;
+  bool _dialogoAberto = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _config = context.read<ConfigController>();
+    // Ao abrir uma lista, a tela de tarefas assume o acelerometro e o
+    // devolve ao sair.
+    _config.iniciarMonitoramento(_aoAgitar);
+  }
+
+  @override
+  void dispose() {
+    _config.pararMonitoramento();
+    super.dispose();
+  }
+
+  /// Agitar na tela principal: vibra e mostra as tarefas mais proximas de vencer.
+  Future<void> _aoAgitar() async {
+    if (!mounted || _dialogoAberto) return;
+
+    final usuarioId = context.read<AuthController>().usuario?.id;
+    if (usuarioId == null) return;
+    final tarefaCtrl = context.read<TarefaController>();
+
+    _dialogoAberto = true;
+    try {
+      await _config.feedbackTatil(duracaoMs: 120);
+      final proximas = await tarefaCtrl.proximosVencimentos(usuarioId);
+      if (!mounted) return;
+
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (_) => _SheetVencimentos(proximas: proximas),
+      );
+    } catch (e, s) {
+      debugPrint('Erro ao buscar vencimentos: $e\n$s');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível carregar os prazos.')),
+        );
+      }
+    } finally {
+      _dialogoAberto = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,9 +157,6 @@ class HomeView extends StatelessWidget {
   }
 
   /// UC3 - abre o formulario de criacao / edicao de lista.
-  /// Os controllers ficam dentro de _FormularioLista, que os descarta quando
-  /// o formulario sai da tela. Descarta-los aqui, logo apos o await, quebrava
-  /// a animacao de saida da folha.
   Future<void> _abrirFormulario(BuildContext context, {Lista? lista}) async {
     final ctrl = context.read<ListaController>();
     final config = context.read<ConfigController>();
@@ -127,9 +180,7 @@ class HomeView extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir lista'),
-        content: Text(
-          'Excluir "${lista.nome}" e todas as suas tarefas?',
-        ),
+        content: Text('Excluir "${lista.nome}" e todas as suas tarefas?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -155,6 +206,65 @@ class HomeView extends StatelessWidget {
       );
     }
   }
+}
+
+/// Folha com os vencimentos mais proximos, com o nome da lista de origem.
+class _SheetVencimentos extends StatelessWidget {
+  const _SheetVencimentos({required this.proximas});
+
+  final List<ProximoVencimento> proximas;
+
+  @override
+  Widget build(BuildContext context) {
+    final cores = Theme.of(context).colorScheme;
+    final tema = Theme.of(context).textTheme;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Próximos vencimentos', style: tema.titleLarge),
+            const SizedBox(height: 8),
+            if (proximas.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  'Nenhuma tarefa pendente com prazo.',
+                  style: tema.bodyMedium,
+                ),
+              )
+            else
+              ...proximas.map((p) {
+                final dias = p.tarefa.diasParaVencer ?? 0;
+                final atrasada = dias < 0;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    atrasada ? Icons.warning_amber_rounded : Icons.schedule,
+                    color: atrasada ? cores.error : cores.primary,
+                  ),
+                  title: Text(p.tarefa.descricao),
+                  subtitle: Text('${p.nomeLista} · ${_textoPrazo(dias)}'),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _textoPrazo(int dias) {
+  if (dias < 0) {
+    final n = -dias;
+    return 'Atrasada há $n ${n == 1 ? 'dia' : 'dias'}';
+  }
+  if (dias == 0) return 'Vence hoje';
+  if (dias == 1) return 'Vence amanhã';
+  return 'Vence em $dias dias';
 }
 
 class _Mensagem extends StatelessWidget {

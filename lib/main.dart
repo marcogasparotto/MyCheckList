@@ -13,6 +13,7 @@ import 'views/cadastro_view.dart';
 import 'views/home_view.dart';
 import 'views/login_view.dart';
 import 'views/splash_view.dart';
+import 'views/config_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +50,7 @@ class MyCheckListApp extends StatelessWidget {
               LoginView.rota: (_) => const LoginView(),
               CadastroView.rota: (_) => const CadastroView(),
               HomeView.rota: (_) => const HomeView(),
+              ConfigView.rota: (_) => const ConfigView(),
               AdminView.rota: (_) => const AdminView(),
             },
           );

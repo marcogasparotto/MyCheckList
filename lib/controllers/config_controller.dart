@@ -5,9 +5,10 @@ import '../services/prefs_service.dart';
 
 /// CONTROLLER - Configuracoes do aplicativo (UC7 / RNF03).
 ///
-/// Tambem centraliza o monitoramento do acelerometro (UC8): a tela de
-/// tarefas pede para ligar/desligar, e este controller mantem uma unica
-/// instancia do DeviceService para todo o app.
+/// Tambem centraliza o acelerometro (UC8). Varias telas podem reagir a
+/// agitacao (a principal mostra vencimentos; a de tarefas limpa o filtro),
+/// entao o controller mantem uma pilha: a tela mais recente assume o sensor
+/// e, ao sair, o sensor volta para a tela anterior.
 class ConfigController extends ChangeNotifier {
   ConfigController({PrefsService? prefs, DeviceService? device})
       : _prefs = prefs ?? PrefsService(),
@@ -19,6 +20,8 @@ class ConfigController extends ChangeNotifier {
   bool _temaEscuro = false;
   bool _vibracao = true;
   bool _carregado = false;
+
+  final List<void Function()> _pilhaAgitacao = [];
 
   bool get temaEscuro => _temaEscuro;
   bool get vibracao => _vibracao;
@@ -54,20 +57,28 @@ class ConfigController extends ChangeNotifier {
 
   // ------------------------------------------------------------- UC8 / UC5
 
-  /// Liga o monitoramento do acelerometro. Deve ser chamado quando a tela
-  /// de tarefas entra em cena.
+  /// Tela nova assume o acelerometro. Chamar no initState da tela.
   void iniciarMonitoramento(void Function() onAgitar) {
-    _device.monitorarAgitacao(onAgitar);
+    _pilhaAgitacao.add(onAgitar);
+    _reiniciarSensor();
   }
 
-  /// Desliga o monitoramento. Deve ser chamado no dispose da tela, para
-  /// que a inscricao no sensor nao sobreviva a ela.
+  /// Tela que sai devolve o acelerometro para a anterior. Chamar no dispose.
   void pararMonitoramento() {
+    if (_pilhaAgitacao.isNotEmpty) _pilhaAgitacao.removeLast();
+    _reiniciarSensor();
+  }
+
+  void _reiniciarSensor() {
     _device.cancelar();
+    if (_pilhaAgitacao.isNotEmpty) {
+      _device.monitorarAgitacao(_pilhaAgitacao.last);
+    }
   }
 
   @override
   void dispose() {
+    _pilhaAgitacao.clear();
     _device.cancelar();
     super.dispose();
   }

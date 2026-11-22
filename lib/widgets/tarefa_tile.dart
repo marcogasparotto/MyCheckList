@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/tarefa.dart';
 
-/// WIDGET - Item de tarefa com caixa de selecao (UC5).
+/// WIDGET - Item de tarefa com caixa de selecao (UC5) e prazo (UC4).
 class TarefaTile extends StatelessWidget {
   const TarefaTile({
     super.key,
@@ -42,6 +42,7 @@ class TarefaTile extends StatelessWidget {
             color: tarefa.concluida ? Theme.of(context).disabledColor : null,
           ),
         ),
+        subtitle: _subtitulo(context),
         trailing: IconButton(
           icon: const Icon(Icons.edit_outlined),
           onPressed: onEditar,
@@ -50,4 +51,33 @@ class TarefaTile extends StatelessWidget {
       ),
     );
   }
+
+  /// Mostra o prazo somente em tarefas pendentes.
+  Widget? _subtitulo(BuildContext context) {
+    final dias = tarefa.diasParaVencer;
+    if (dias == null || tarefa.concluida) return null;
+
+    final cores = Theme.of(context).colorScheme;
+    Color cor = cores.onSurfaceVariant;
+    if (dias <= 0) {
+      cor = cores.error;
+    } else if (dias <= 2) {
+      cor = cores.tertiary;
+    }
+
+    return Text(
+      _textoPrazo(dias),
+      style: TextStyle(color: cor, fontWeight: dias <= 2 ? FontWeight.w600 : null),
+    );
+  }
+}
+
+String _textoPrazo(int dias) {
+  if (dias < 0) {
+    final n = -dias;
+    return 'Atrasada há $n ${n == 1 ? 'dia' : 'dias'}';
+  }
+  if (dias == 0) return 'Vence hoje';
+  if (dias == 1) return 'Vence amanhã';
+  return 'Vence em $dias dias';
 }

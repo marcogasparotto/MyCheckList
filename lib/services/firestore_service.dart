@@ -137,6 +137,22 @@ class FirestoreService {
     await _recalcularContadores(listaId, usuarioId);
   }
 
+  /// Tarefas pendentes do usuario que tem prazo. Filtra concluida e prazo
+  /// em memoria para nao exigir indice composto no Firestore.
+  Future<List<Tarefa>> buscarTarefasComPrazo(String usuarioId) async {
+    final snap = await _tarefas.where('usuarioId', isEqualTo: usuarioId).get();
+    return snap.docs
+        .map((d) => Tarefa.fromMap(d.id, d.data()))
+        .where((t) => !t.concluida && t.prazo != null)
+        .toList();
+  }
+
+  /// Listas do usuario, para mostrar o nome da lista de origem.
+  Future<List<Lista>> buscarListas(String usuarioId) async {
+    final snap = await _listas.where('usuarioId', isEqualTo: usuarioId).get();
+    return snap.docs.map((d) => Lista.fromMap(d.id, d.data())).toList();
+  }
+
   /// Mantem os agregados da lista atualizados para a tela principal (UC6).
   /// A consulta filtra por usuarioId para passar pelas regras (RNF07).
   Future<void> _recalcularContadores(String listaId, String usuarioId) async {

@@ -21,6 +21,7 @@ class TarefasView extends StatefulWidget {
 
 class _TarefasViewState extends State<TarefasView> {
   final TextEditingController _novaTarefa = TextEditingController();
+  final TextEditingController _novoPrazo = TextEditingController();
 
   // Guardados no initState para serem usados com seguranca depois de awaits.
   late final ConfigController _config;
@@ -36,8 +37,6 @@ class _TarefasViewState extends State<TarefasView> {
   @override
   void initState() {
     super.initState();
-    // Captura os controllers UMA vez, antes de qualquer await. Usar
-    // context.read depois de um await pode tocar num Provider ja destruido.
     _config = context.read<ConfigController>();
     _tarefaCtrl = context.read<TarefaController>();
     _auth = context.read<AuthController>();
@@ -52,9 +51,10 @@ class _TarefasViewState extends State<TarefasView> {
 
   @override
   void dispose() {
-    // Cancela a inscricao no acelerometro ANTES de a tela sair da arvore.
+    // Devolve o acelerometro para a tela principal.
     _config.pararMonitoramento();
     _novaTarefa.dispose();
+    _novoPrazo.dispose();
     super.dispose();
   }
 
@@ -93,7 +93,7 @@ class _TarefasViewState extends State<TarefasView> {
     }
   }
 
-  /// UC4 - adiciona tarefa.
+  /// UC4 - adiciona tarefa. O prazo em dias e opcional.
   Future<void> _adicionar() async {
     final usuarioId = _auth.usuario?.id;
     if (usuarioId == null) return;
@@ -102,12 +102,14 @@ class _TarefasViewState extends State<TarefasView> {
       listaId: widget.lista.id,
       usuarioId: usuarioId,
       descricao: _novaTarefa.text,
+      prazoDias: int.tryParse(_novoPrazo.text.trim()),
     );
 
     if (!mounted) return;
 
     if (ok) {
       _novaTarefa.clear();
+      _novoPrazo.clear();
       FocusScope.of(context).unfocus();
       await _config.feedbackTatil(duracaoMs: 40);
     } else {
@@ -117,23 +119,33 @@ class _TarefasViewState extends State<TarefasView> {
     }
   }
 
-  /// UC4 - edita a descricao de uma tarefa existente.
+  /// UC4 - edita a descricao e o prazo de uma tarefa existente.
   Future<void> _editar(Tarefa tarefa) async {
-    final novo = await showDialog<String>(
+    final restantes = tarefa.diasParaVencer;
+
+    final edicao = await showDialog<({String descricao, int? dias})>(
       context: context,
-      builder: (_) => _DialogoEdicaoTarefa(descricaoInicial: tarefa.descricao),
+      builder: (_) => _DialogoEdicaoTarefa(
+        descricaoInicial: tarefa.descricao,
+        diasInicial: restantes == null ? null : (restantes < 0 ? 0 : restantes),
+      ),
     );
 
-    // Cancelar devolve null: nada e gravado.
-    if (novo == null || novo.trim().isEmpty || !mounted) return;
+    if (edicao == null || edicao.descricao.trim().isEmpty || !mounted) return;
 
     try {
-          await _tarefaCtrl.editar(
+      final ok = await _tarefaCtrl.editar(
         id: tarefa.id,
         listaId: tarefa.listaId,
         usuarioId: tarefa.usuarioId,
-        descricao: novo,
+        descricao: edicao.descricao,
+        prazoDias: edicao.dias,
       );
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_tarefaCtrl.erro ?? 'Não foi possível salvar.')),
+        );
+      }
     } catch (e, s) {
       debugPrint('Erro ao editar tarefa: $e\n$s');
       if (!mounted) return;
@@ -268,6 +280,18 @@ class _TarefasViewState extends State<TarefasView> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  SizedBox(
+                    width: 72,
+                    child: TextField(
+                      controller: _novoPrazo,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        hintText: 'dias',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton.filled(
                     onPressed: _adicionar,
                     icon: const Icon(Icons.add),
@@ -282,13 +306,16 @@ class _TarefasViewState extends State<TarefasView> {
   }
 }
 
-/// Caixa de edicao da descricao. O controller fica no State deste dialogo e
-/// so e descartado depois que o dialogo sai da tela. Se ele fosse descartado
-/// logo apos o await, a animacao de saida ainda o usaria e daria erro.
+/// Caixa de edicao da descricao e do prazo. Os controllers ficam no State
+/// deste dialogo e so sao descartados quando o dialogo sai da tela.
 class _DialogoEdicaoTarefa extends StatefulWidget {
-  const _DialogoEdicaoTarefa({required this.descricaoInicial});
+  const _DialogoEdicaoTarefa({
+    required this.descricaoInicial,
+    this.diasInicial,
+  });
 
   final String descricaoInicial;
+  final int? diasInicial;
 
   @override
   State<_DialogoEdicaoTarefa> createState() => _DialogoEdicaoTarefaState();
@@ -296,16 +323,19 @@ class _DialogoEdicaoTarefa extends StatefulWidget {
 
 class _DialogoEdicaoTarefaState extends State<_DialogoEdicaoTarefa> {
   late final TextEditingController _campo;
+  late final TextEditingController _dias;
 
   @override
   void initState() {
     super.initState();
     _campo = TextEditingController(text: widget.descricaoInicial);
+    _dias = TextEditingController(text: widget.diasInicial?.toString() ?? '');
   }
 
   @override
   void dispose() {
     _campo.dispose();
+    _dias.dispose();
     super.dispose();
   }
 
@@ -313,10 +343,24 @@ class _DialogoEdicaoTarefaState extends State<_DialogoEdicaoTarefa> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Editar tarefa'),
-      content: TextField(
-        controller: _campo,
-        autofocus: true,
-        decoration: const InputDecoration(labelText: 'Descrição'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _campo,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Descrição'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _dias,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Prazo em dias (opcional)',
+              helperText: 'Contado a partir de hoje. Vazio = sem prazo.',
+            ),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -324,7 +368,10 @@ class _DialogoEdicaoTarefaState extends State<_DialogoEdicaoTarefa> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(_campo.text),
+          onPressed: () => Navigator.of(context).pop((
+            descricao: _campo.text,
+            dias: int.tryParse(_dias.text.trim()),
+          )),
           child: const Text('Salvar'),
         ),
       ],
