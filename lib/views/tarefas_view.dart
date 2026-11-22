@@ -128,9 +128,10 @@ class _TarefasViewState extends State<TarefasView> {
     if (novo == null || novo.trim().isEmpty || !mounted) return;
 
     try {
-      await _tarefaCtrl.editar(
+          await _tarefaCtrl.editar(
         id: tarefa.id,
         listaId: tarefa.listaId,
+        usuarioId: tarefa.usuarioId,
         descricao: novo,
       );
     } catch (e, s) {

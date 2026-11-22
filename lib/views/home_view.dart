@@ -146,7 +146,7 @@ class HomeView extends StatelessWidget {
     if (confirmado != true || !context.mounted) return;
 
     try {
-      await context.read<ListaController>().excluir(lista.id);
+      await context.read<ListaController>().excluir(lista);
     } catch (e, s) {
       debugPrint('Erro ao excluir lista: $e\n$s');
       if (!context.mounted) return;
